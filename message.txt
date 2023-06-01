@@ -1,179 +1,262 @@
-import pygame
-import sys
-import random
-from pygame.locals import *  # udostępnienie nazw metod z locals
+using System.Reflection.Metadata.Ecma335;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography.X509Certificates;
 
-# inicjacja modułu pygame
-pygame.init()
+namespace gra
+{
+    class gra
+    {
+        static int[,] postacie = { { 200, 60, 0, 15 }, { 150, 30, 150, 20 }, { 120, 40, 30, 35 } }; //Postacie do wywboru pokolei
+        static String[] nazwyPostaci = { "Wojownik", "Mag", "Bandyta" }; // Nazwy Postaci
 
-# przygotowanie powierzchni do rysowania, czyli inicjacja okna gry
-OKNOGRY = pygame.display.set_mode((150, 150), 0, 32)
-# tytuł okna gry
-pygame.display.set_caption('Kółko i krzyżyk')
+        static int hp, attack, mana, gold = 0; //tworzenie statow jeszcze nie przypisane do postaci
+        static int mhp, mattack, mmana, mgold = 0; // tworzenie statow potwora nie przypisane bo robią się nowe
+        static String name = ""; // tworzenie nazwy 
 
-# lista opisująca stan pola gry, 0 - pole puste, 1 - gracz, 2 - komputer
-POLE_GRY = [0, 0, 0,
-            0, 0, 0,
-            0, 0, 0]
+        static void komunikat(string x)
+        {
+            Console.Clear(); // czyści konsole
+            Console.WriteLine(x); // pisze tekst
+            Console.ReadKey(); // czeka na cokolwiek
+            Console.Clear(); // znpwu czysci
+        }
 
-RUCH = 1  # do kogo należy ruch: 1 – gracz, 2 – komputer
-WYGRANY = 0  # wynik gry: 0 - nikt, 1 - gracz, 2 - komputer, 3 - remis
-WYGRANA = False
+        public static void wyborpostac()
+        {
+            while (hp == 0) // jeśli będzie zły numer to wróci bo nie jest przypisane (mogło to być wszystko inne)
+            {
+                Console.WriteLine("Wybor postaci: \n Wojownik - 1 \n Mag - 2 \n bandyta - 3 "); // pisze
+                int input = int.Parse(Console.ReadLine()); // pyta się o numer z wczesniejszego pytania
+                if (input != 1 && input != 2 && input != 3) // jesli bedą inne inz 1,2 lub 3 to wraca (  && znaczy i)
+                {
+                    komunikat("zły numer");
+                }
+                else
+                {
+                    int x = input - 1; // -1 bo indeksy zaczynają się od zera a użytkownik jest pytany od 1
+                    hp = postacie[x, 0]; // przypisuje wszystkie staty z wcześniejszej listy postaci
+                    attack = postacie[x, 1];
+                    mana = postacie[x, 2];
+                    gold = postacie[x, 3];
+                    name = nazwyPostaci[x];
+                }
+            }
+        }
 
-# rysowanie planszy gry, czyli linii oddzielających pola
+        public static void statyporwora()
+        {
+            Random rnd = new Random(); // tworzy randoma
+            mhp = rnd.Next(20, 50); // przypisuje randomowe liczby od x, do ,x
+            mattack = rnd.Next(15, 50);
+            mmana = rnd.Next(5, 20);
+            mgold = rnd.Next(3, 40);
+        }
 
+        public static void heal()
+        {
+            if (mana >= 20) // sprawdza czy masz wystarczająco many
+            {
+                hp += 15; // dodaje hp z heala
+                mana -= 20; // zabiera mane z użycia
+                komunikat("Użyłeś Heala (+15 hp  -20 many)");
 
-def rysuj_plansze():
-    for i in range(0, 3):  # x
-        for j in range(0, 3):  # y
-            # argumenty: powierzchnia, kolor, x,y, w,h, grubość linii
-            pygame.draw.rect(OKNOGRY, (255, 255, 255),
-                             Rect((j * 50, i * 50), (50, 50)), 1)
+            }
+            else
+            {
+                komunikat("Brak many"); // jeśli nie masz many to no
+            }
+        }
 
-# narysuj kółka
+        public static void boost() // to samo co wcześniejszy
+        {
+            if (mana >= 30)
+            {
+                hp += 10;
+                attack += 10;
+                mana -= 30;
+                komunikat("Użyłeś Boosta (+10 hp   +10 dmg   -30 many)");
+            }
+            else
+            {
+                komunikat("Brak many");
+            }
+        }
 
-def rysuj_pole_gry():
-    for i in range(0, 3):
-        for j in range(0, 3):
-            pole = i * 3 + j  # zmienna pole przyjmuje wartości od 0-8
-            # x i y określają środki kolejnych pól,
-            x = j * 50 + 25
-            y = i * 50 + 25
-
-            if POLE_GRY[pole] == 1:
-                # rysuj kółko gracza
-                pygame.draw.circle(OKNOGRY, (0, 0, 255), (x, y), 10)
-            elif POLE_GRY[pole] == 2:
-                # rysuj kółko komputera
-                pygame.draw.circle(OKNOGRY, (255, 0, 0), (x, y), 10)
-
-# postaw kółko ale w innym kolorze
-
-
-def postaw_znak(pole, RUCH):
-    if POLE_GRY[pole] == 0:
-        if RUCH == 1:  # ruch gracza
-            POLE_GRY[pole] = 1
-            return 2
-        elif RUCH == 2:  # ruch komputera
-            POLE_GRY[pole] = 2
-            return 1
-
-    return RUCH
-
-# funkcja pomocnicza sprawdzająca, czy komputer może wygrać, czy powinien
-# blokować gracza, czy może wygrał komputer lub gracz
-
-
-def sprawdz_pola(uklad, wygrany=None):
-    wartosc = None
-    # lista wielowymiarowa, której elementami są inne listy zagnieżdżone
-    POLA_INDEKSY = [  # trójki pól planszy do sprawdzania
-        [0, 1, 2], [3, 4, 5], [6, 7, 8],  # indeksy pól w poziomie (wiersze)
-        [0, 3, 6], [1, 4, 7], [2, 5, 8],  # indeksy pól w pionie (kolumny)
-        [0, 4, 8], [2, 4, 6]  # indeksy pól na skos (przekątne)
-    ]
-
-    for lista in POLA_INDEKSY:
-        kol = []  # lista pomocnicza
-        for ind in lista:
-            kol.append(POLE_GRY[ind])  # zapisz wartość odczytaną z POLE_GRY
-        if (kol in uklad):  # jeżeli znalazłeś układ wygrywający lub blokujący zwróć wygranego (1,2) lub indeks pola do zaznaczenia
-            wartosc = wygrany if wygrany else lista[kol.index(0)]
-
-    return wartosc
-
-# ruch komputer
-
-def ai_ruch(RUCH):
-    pole = None  # które pole powinien zaznaczyć komputer
-
-    # listy ,których elementami są inne listy
-    uklady_wygrywam = [[2, 2, 0], [2, 0, 2], [0, 2, 2]]
-    uklady_blokuje = [[1, 1, 0], [1, 0, 1], [0, 1, 1]]
-
-    # sprawdź, czy komputer może wygrać
-    pole = sprawdz_pola(uklady_wygrywam)
-    if pole is not None:
-        return postaw_znak(pole, RUCH)
-
-    # jeżeli komputer nie może wygrać, blokuj gracza
-    pole = sprawdz_pola(uklady_blokuje)
-    if pole is not None:
-        return postaw_znak(pole, RUCH)
-
-    # jeżeli nie można wygrać i gracza nie trzeba blokować, wylosuj pole
-    while pole is None:
-        pos = random.randrange(0, 9)  # wylosuj wartość od 0 do 8
-        if POLE_GRY[pos] == 0:
-            pole = pos
-
-    return postaw_znak(pole, RUCH)
-
-# sprawdź, kto wygrał, chyba że jest remis
+        public static void sklep()
+        {
+            Console.Clear(); // clear
+            Console.WriteLine("\n *Widzisz ceny na tablic* ");
+            Console.WriteLine("\n1 - +25hp = 5 złota \n 2 - +20 ataku = 15 złota \n 3 - +50 many = 8 złota \n dowolny inny numer - wyjdz");
+            int input = int.Parse(Console.ReadLine()); // pyta się
+            switch (input)
+            {
+                case 1: // jesli input to 1
+                    Heal(); // wywołuje(używa) heala
+                    break;
+                case 2:
+                    Bron(); // to samo co wcześniej
+                    break;
+                case 3:
+                    AddMana(); // x
+                    break;
+                default:
+                    komunikat("\nWychodzisz ze sklepu"); // jeśli wciśnie inny numerek to wychodzi
+                    break;
+            }
+        }
 
 
-def kto_wygral():
-    # układy wygrywające dla gracza i komputera
-    uklad_gracz = [[1, 1, 1]]
-    uklad_komp = [[2, 2, 2]]
+        static void AddMana()
+        {
+            if (gold - 8 < 0) // sprawdza czy nasz wystarczająco hajsu
+            {
+                komunikat($"\nnie masz wystarczająco pieniędzy\n Potrzebujesz jeszcze {8 - gold} złota"); // ile potrzebujesz
+            }
+            else // jeśli masz
+            {
+                gold -= 8; // zabiera ci hajs
+                mana += 50; // daje ci mane
+            }
+        }
 
-    WYGRANY = sprawdz_pola(uklad_gracz, 1)  # czy wygrał gracz?
-    if not WYGRANY:  # jeżeli gracz nie wygrywa
-        WYGRANY = sprawdz_pola(uklad_komp, 2)  # czy wygrał komputer?
+        static void Bron() // to samo ...
+        {
+            if ((gold - 15) < 0)
+            {
+                komunikat($"\nnie masz wystarczająco pieniędzy\n Potrzebujesz jeszcze {15 - gold} złota");
+            }
+            else
+            {
+                gold -= 15;
+                attack += 20;
+            }
+        }
 
-    # sprawdź remis
-    if 0 not in POLE_GRY and WYGRANY not in [1, 2]:
-        WYGRANY = 3
+        static void Heal() // ...
+        {
+            if ((gold - 5) < 0)
+            {
+                komunikat($"\nnie masz wystarczająco pieniędzy\n Potrzebujesz jeszcze {5 - gold} złota");
+            }
+            else
+            {
+                gold -= 5;
+                hp += 25;
+            }
+        }
 
-    return WYGRANY
+        static void Main() // główna funkcja w grze
+        {
+            wyborpostac(); // wywołuje 
+            while (hp > 0) // dopoki nie zdechniesz to robi to wszystko
+            {
 
-# wyświetlająca komunikat końcowy
-# tworzy nowy obrazek z tekstem
-# rysuje w oknie gry
+                Console.Clear(); // clear
+                Console.WriteLine($"\n{name}:\n hp - {hp}\n dmg - {attack}\n mana - {mana}\n złoto - {gold}"); // wypisuje staty
+                Console.WriteLine("\n=========================\n");
+                Console.WriteLine("\nCo chcesz zrobić? \n 1 - Idz do sklepu\n 2 - Idz na wyprawe");
+                int inp = int.Parse(Console.ReadLine()); // pyta się
+                if (inp == 1) // jeśli dostał 1 to idzie do sklepu
+                {
+                    sklep(); // wywołuje
+                }
+                else if (inp == 2) // jeśli na wyprawe
+                {
+                    Console.Clear();
+                    statyporwora(); // wywołuje to co wcześniej było te takie randomy
+                    wyprawa(); // wychodzi
+
+                }
+            }
+        }
 
 
-def drukuj_wynik(WYGRANY):
-    fontObj = pygame.font.Font('freesansbold.ttf', 16)
-    if WYGRANY == 1:
-        tekst = u'Wygrał gracz!'
-    elif WYGRANY == 2:
-        tekst = u'Wygrał komputer!'
-    elif WYGRANY == 3:
-        tekst = 'Remis!'
-    tekst_obr = fontObj.render(tekst, True, (20, 255, 20))
-    tekst_prost = tekst_obr.get_rect()
-    tekst_prost.center = (75, 75)
-    OKNOGRY.blit(tekst_obr, tekst_prost)
 
+        static void walka()
+        {
+            Console.Clear();
+            Console.WriteLine("Walka");
 
-# pętla główna programu
-while True:
-    # obsługa zdarzeń
-    for event in pygame.event.get():
-        # przechwyć zamknięcie okna
-        if event.type == QUIT:
-            pygame.quit()
-            sys.exit()
+            komunikat($"\nPotwór zadaje ci {mattack}"); // mówi ile zadał ci
+            hp -= mattack;
+            komunikat($"\nTy zadajesz mu {attack}"); // ile zadałeś ty
+            mhp -= attack;
 
-        if WYGRANA is False:
-            if RUCH == 1:
-                if event.type == MOUSEBUTTONDOWN:
-                    if event.button == 1:  # jeżeli naciśnięto 1. przycisk
-                        mouseX, mouseY = event.pos  # rozpakowanie tupli
-                        # wylicz indeks klikniętego pola
-                        pole = (int(mouseY / 50) * 3) + int(mouseX / 50)
-                        RUCH = postaw_znak(pole, RUCH)
-            elif RUCH == 2:
-                RUCH = ai_ruch(RUCH)
+            if (hp <= 0) // jeśli masz mniej niż 0 to zdychasz
+            {
+                komunikat("UMARŁEŚ!!!!");
+                return;
+            }
+            if (mhp <= 0) // jeśli on ma
+            {
+                komunikat($"\nzabierasz potworowi {mgold} złota i pobierasz kawałki many z jego duszy");
+                gold += mgold; // loocisz borowika do zera 
+                mana += mmana;
+            }
+        }
 
-            WYGRANY = kto_wygral()
-            if WYGRANY is not None:
-                WYGRANA = True
+        static void zaklecia()
+        {
 
-    OKNOGRY.fill((0, 0, 0))  # definicja koloru
-    rysuj_plansze()
-    rysuj_pole_gry()
-    if WYGRANA:
-        drukuj_wynik(WYGRANY)
-    pygame.display.update()
+            Console.Clear();
+            Console.WriteLine("\nZaklęcia\n 1 - heal(+15   hp   -20 many)\n 3 - Boost(+10 hp   +10 dmg   -30 many)");
+            int x = int.Parse(Console.ReadLine());
+            switch (x)
+            {
+                case 1: // jeśli 1 
+                    heal(); // czarymary heal
+                    break;
+                case 2:
+                    boost(); // czarymary boost
+                    break;
+                default:
+                    komunikat("\nzły numer"); // jesteś idiotą i wpisałeś zły numer
+                    break;
+            }
+        }
+
+        static void ucieczka()
+        {
+            komunikat("\nUciekasz"); // robisz to co każdy szanowany się mężczyzna po wynikach ciążowych
+            Random rnd = new Random(); // random
+            int ucieczka = rnd.Next(1, 6); // losuje ci czy uciekniesz
+            if (ucieczka == 2 || ucieczka == 5) // jeśli miałeś 2 lub 5 to uciekasz ( || to jest lub)
+            {
+                komunikat("\nUdaje ci się uciec"); // wow
+                mhp = 0; // wtedy wywala tamto spotkanie go 
+            }
+            else // inaczej to dostajesz na pizde od niego
+            {
+                hp -= (mattack * 2); // jego attack razy 2 💀💀 
+                komunikat("\nNie udaje ci się uciec potwór zadaje ci podwójne obrażenia");
+            }
+        }
+
+        static void wyprawa()
+        {
+            while (mhp > 0) // to co było powyżej napisane o tyn mhp = 0 to tu działa
+            {
+                Console.Clear();
+                Console.WriteLine("\n Spotykasz potwora\nCo robisz?\n 1 - Walczysz\n 2 - Używasz Zaklęć\n 3 - Spróbuj ucieczki");
+                Console.WriteLine($"\n Potwór: hp - {mhp}\n dmg - {mattack}\n mana - {mmana}\n złoto - {mgold}"); // ile on ma hp itd
+                int input = int.Parse(Console.ReadLine());
+                switch (input)
+                {
+                    case 1:
+                        walka(); // wywołuje funkcję
+                        break;
+                    case 2:
+                        zaklecia(); // ...
+                        break;
+                    case 3:
+                        ucieczka(); // ...
+                        break;
+                    default:
+                        komunikat("zły numer");
+                        break;
+                }
+            }
+        }
+    }
+}
+// koniec mam nadzieje na 6 
